@@ -1,0 +1,13 @@
+{
+  "name": "vldtr",
+  "version": "0.0.1",
+  "description": "Multi level validator, validator schemes (collection of validators) and sanitization with express middleware support.",
+  "main": "index.js",
+  "keywords": [
+    "validate",
+    "validator",
+    "validation"
+  ],
+  "author": "Janko Vukotic <jankovukotic@gmail.com",
+  "dependencies": {}
+}
