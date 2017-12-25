@@ -1,4 +1,16 @@
-const vldtr = require('./index');
+const vldtr = require('./index')({
+    validators: {
+        testValidator: (value, min, max) => {
+            return value.length >= min && value.length <= max;
+        },
+    },
+    validatorSchemes: {
+        testScheme: (value) => {
+            return [['testValidator', [2, 35]]];
+        }
+    },       
+});
+
 vldtr.run(
     {
         keys: {

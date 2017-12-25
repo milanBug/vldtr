@@ -3,6 +3,8 @@
 Multi level **validator**, **validator schemes** (collection of validators) and **sanitization** with express middleware support.
 
 ##Usage
+// Require the validator and pass additional configuration
+const vldtr = require('./index')(config)
 
 ### "group" object
 This object is sent to the validator
