@@ -1,5 +1,3 @@
-"use strict";
-
 class Vldtr {
     constructor(config) {
         this.cfg = {
@@ -38,7 +36,7 @@ class Vldtr {
                             }
                             default: {
                                 if (number < 0 || number > 60) valid = false;
-                                break;                                
+                                break;
                             }
                         }
                     });
@@ -49,60 +47,63 @@ class Vldtr {
                     return !isNaN(date.getTime());
                 },
                 validMin: (group, min) => {
-                    for (const key in group.keys) {
+                    let minimum = min;
+                    let valid = false;
+                    Object.keys(group.keys).forEach((key) => {
                         if (group.keys.hasOwnProperty(key)) {
-                            if (group.keys[key]['valid'] === true) {
-                                min--;
+                            if (group.keys[key].valid === true) {
+                                minimum -= 1;
                             }
-                            if (min < 1) {
-                                return true;
+                            if (minimum < 1) {
+                                valid = true;
                             }
                         }
-                    }
-                    return false;
+                    });
+                    return valid;
+                },
+                invalidMax: (group, max) => {
+                    let counter = 0;
+                    let valid = true;
+                    Object.keys(group.keys).forEach((key) => {
+                        if (group.keys.hasOwnProperty(key)) {
+                            if (group.keys[key].valid !== true) {
+                                counter += 1;
+                            }
+                            if (counter > max) {
+                                valid = false;
+                            }
+                        }
+                    });
+                    return valid;
                 },
             },
             validatorSchemes: {
-                name: (value) => {
-                    return [['range', [2, 35]]];
-                },
-                password: (value) => {
-                    return [['range', [6, 50]]];
-                },
-                text: (value) => {
-                    return [['range', [1, 150]]];
-                },
-                boolean: (value) => {
-                    return [
-                        ['isNumber'],
-                        ['between', [0, 1]],
-                    ];
-                },
+                name: value => [['range', [2, 35]]],
+                password: value => [['range', [6, 50]]],
+                text: value => [['range', [1, 150]]],
+                boolean: value => [
+                    ['isNumber'],
+                    ['between', [0, 1]],
+                ],
             },
             sanitizations: {
-                trim: (value) => {
-                    return value;
-                },
-                dotAdd: (value) => {
-                    return value + '.';
-                },
-                plusAdd: (value, side) => {
-                    return (side === 'left' ? '+' : '') + value + (side === 'right' ? '+' : '');
-                },
+                trim: value => value.replace(/^\s+|\s+$/g, ''),
+                dotAdd: value => `${value}.`,
+                plusAdd: (value, side) =>
+                    `${side === 'left' ? '+' : ''}${value}${side === 'right' ? '+' : ''}`,
             },
             sanitizationSchemes: {
-                dotPlus: (value, side) => {
-                    return [
-                        ['plusAdd', ['left']],
-                        ['dotAdd'],
-                    ];
-                },
+                dotPlus: (value, side) => [
+                    ['plusAdd', ['left']],
+                    ['dotAdd'],
+                ],
             },
         };
+
         if (config) {
             const configKeys = Object.keys(config);
             configKeys.forEach((key) => {
-                Object.assign(this.cfg[key], config[key]);    
+                Object.assign(this.cfg[key], config[key]);
             });
         }
     }
@@ -120,26 +121,26 @@ class Vldtr {
         // If is set value
         if (typeof value !== 'undefined') {
             // Validators
-            if (typeof key['validators'] !== 'undefined') {
-                Object.assign(errors, await this.validators(key['validators'], value));
+            if (typeof key.validators !== 'undefined') {
+                Object.assign(errors, await this.validators(key.validators, value));
             }
             // Validator Schemes
-            if (typeof key['validatorSchemes'] !== 'undefined') {
-                Object.assign(errors, await this.validatorSchemes(key['validatorSchemes'], value));
+            if (typeof key.validatorSchemes !== 'undefined') {
+                Object.assign(errors, await this.validatorSchemes(key.validatorSchemes, value));
             }
             // Sanitizations
-            if (typeof key['sanitizations'] !== 'undefined') {
-                valueSanitized = await this.sanitizations(key['sanitizations'], value);
+            if (typeof key.sanitizations !== 'undefined') {
+                valueSanitized = await this.sanitizations(key.sanitizations, value);
             }
             // Sanitization Schemes
-            if (typeof key['sanitizationSchemes'] !== 'undefined') {
-                valueSanitized = await this.sanitizationSchemes(key['sanitizationSchemes'], value);
+            if (typeof key.sanitizationSchemes !== 'undefined') {
+                valueSanitized = await this.sanitizationSchemes(key.sanitizationSchemes, value);
             }
         }
         // If is not set and IS NOT optional
-        else if (typeof key['optional'] === 'undefined' || key['optional'] !== true) {
+        else if (typeof key.optional === 'undefined' || key.optional !== true) {
             errors = {
-                'optional': [],
+                optional: [],
             };
         }
         return {
@@ -160,18 +161,20 @@ class Vldtr {
         let errors = {};
         let valid = true;
         // Check if first child keys have errors
-        for (const key in group.keys) {
-            if (group.keys.hasOwnProperty(key)) {
-                if (group.keys[key]['valid'] === false) {
-                    valid = false;
-                    break;
+        if (typeof group.if === 'undefined' || group.if) {
+            Object.keys(group.keys).forEach((key) => {
+                if (valid && group.keys.hasOwnProperty(key)) {
+                    if (group.keys[key].valid === false) {
+                        valid = false;
+                    }
                 }
+            });
+            if (typeof group.validators !== 'undefined') {
+                errors = await this.validators(group.validators, group);
+                valid = Object.keys(errors).length === 0;
             }
         }
-        if (typeof group['validators'] !== 'undefined') {
-            errors = await this.validators(group['validators'], group);
-            valid = Object.keys(errors).length === 0;
-        }
+
         return {
             errors: errors,
             valid: valid,
@@ -187,7 +190,7 @@ class Vldtr {
      */
     async validators(validators, param) {
         const errors = [];
-        for (const validator of validators) {
+        await Promise.all(validators.map(async (validator) => {
             const name = validator[0];
             const options = typeof validator[1] !== 'undefined' ? validator[1] : [];
             // Check if validator is defined
@@ -196,9 +199,10 @@ class Vldtr {
                     errors[name] = options;
                 }
             } else {
-                throw 'Validator ' + name + ' does not exist.';
+                const error = `Validator ${name} does not exist.`;
+                throw error;
             }
-        }
+        }));
         return errors;
     }
 
@@ -210,19 +214,23 @@ class Vldtr {
      */
     async validatorSchemes(schemes, param) {
         const errors = [];
-        for (const scheme of schemes) {
+        await Promise.all(schemes.map(async (scheme) => {
             const name = scheme[0];
             const options = typeof scheme[1] !== 'undefined' ? scheme[1] : [];
             // Check if scheme is defined
             if (typeof this.cfg.validatorSchemes[name] !== 'undefined') {
-                const validatorErrors = await this.validators(this.cfg.validatorSchemes[name](param, ...options), param);
+                const validatorErrors = await this.validators(
+                    this.cfg.validatorSchemes[name](param, ...options),
+                    param,
+                );
                 if (Object.keys(validatorErrors).length > 0) {
                     Object.assign(errors, validatorErrors);
                 }
             } else {
-                throw 'Validator scheme ' + name + ' does not exist.';
+                const error = `Validator scheme ${name} does not exist.`;
+                throw error;
             }
-        }
+        }));
         return errors;
     }
 
@@ -233,17 +241,19 @@ class Vldtr {
      * @param value
      */
     async sanitizations(sanitizations, value) {
-        for (const sanitization of sanitizations) {
+        let sanitized = value;
+        await Promise.all(sanitizations.map(async (sanitization) => {
             const name = sanitization[0];
             const options = typeof sanitization[1] !== 'undefined' ? sanitization[1] : [];
             // Check if validator is defined
             if (typeof this.cfg.sanitizations[name] !== 'undefined') {
-                value = await this.cfg.sanitizations[name](value, ...options)
+                sanitized = await this.cfg.sanitizations[name](value, ...options);
             } else {
-                throw 'Sanitization ' + name + ' does not exist.';
+                const error = `Sanitization ${name} does not exist.`;
+                throw error;
             }
-        }
-        return value;
+        }));
+        return sanitized;
     }
 
     /**
@@ -253,18 +263,24 @@ class Vldtr {
      * @param value
      */
     async sanitizationSchemes(schemes, value) {
-        for (const scheme of schemes) {
+        let sanitized = value;
+        await Promise.all(schemes.map(async (scheme) => {
             const name = scheme[0];
             const options = typeof scheme[1] !== 'undefined' ? scheme[1] : [];
             // Check if scheme is defined
             if (typeof this.cfg.sanitizationSchemes[name] !== 'undefined') {
-                value = await this.sanitizations(this.cfg.sanitizationSchemes[name](value, ...options), value);
+                sanitized = await this.sanitizations(
+                    this.cfg.sanitizationSchemes[name](value, ...options),
+                    value,
+                );
             } else {
-                throw 'Sanitization scheme ' + name + ' does not exist.';
+                const error = `Sanitization scheme ${name} does not exist.`;
+                throw error;
             }
-        }
-        return value;
+        }));
+        return sanitized;
     }
+
     /**
      * Run as middleware
      * @param group
@@ -275,13 +291,16 @@ class Vldtr {
         return async (req, res, next) => {
             req.vldtr = await this.run(group, req[location]);
             const errors = await this.errorsObject(req.vldtr);
+            const values = await this.valuesObject(req.vldtr);
             if (throwError && Object.keys(errors).length > 0) {
-                throw {
+                const error = {
                     statusCode: 400,
                     key: 'validation',
                     response: errors,
                     error: errors,
+                    values: values,
                 };
+                throw error;
             }
             next();
         };
@@ -295,10 +314,11 @@ class Vldtr {
      * @returns {Promise<*>}
      */
     async run(group, values) {
-        for (const key in group.keys) {
+        const keys = Object.keys(group.keys);
+        await Promise.all(keys.map(async (key) => {
             if (group.keys.hasOwnProperty(key)) {
                 // Group
-                if (typeof group.keys[key]['keys'] !== 'undefined') {
+                if (typeof group.keys[key].keys !== 'undefined') {
                     group.keys[key] = await this.run(group.keys[key], values);
                 }
                 // Key
@@ -308,7 +328,7 @@ class Vldtr {
                     Object.assign(group.keys[key], await this.processKey(group.keys[key], value));
                 }
             }
-        }
+        }));
         // Process group
         Object.assign(group, await this.processGroup(group));
         // Return
@@ -325,28 +345,58 @@ class Vldtr {
     async errorsObject(group, key = '*') {
         let errors = {};
         // Go deep only if group is NOT valid
-        if (group['valid'] === false) {
-            if (Object.keys(group['errors']).length > 0) {
-                errors[key] = group['errors'];
+        if (group.valid === false) {
+            if (Object.keys(group.errors).length > 0) {
+                errors[key] = group.errors;
             }
-            for (const key in group.keys) {
-                if (group.keys.hasOwnProperty(key)) {
+            const keys = Object.keys(group.keys);
+            await Promise.all(keys.map(async (currentKey) => {
+                if (group.keys.hasOwnProperty(currentKey)) {
                     // Group
-                    if (typeof group.keys[key]['keys'] !== 'undefined') {
-                        Object.assign(errors, await this.errorsObject(group.keys[key], key));
+                    if (typeof group.keys[currentKey].keys !== 'undefined') {
+                        Object.assign(errors, await this.errorsObject(
+                            group.keys[currentKey],
+                            currentKey,
+                        ));
                     }
                     // Key
-                    else {
-                        if (group.keys[key]['valid'] === false) {
-                            errors[key] = group.keys[key]['errors'];
-                        }
+                    else if (group.keys[currentKey].valid === false) {
+                        errors[currentKey] = group.keys[currentKey].errors;
                     }
                 }
-            }
+            }));
         }
-
         return errors;
-    }   
+    }
+
+    /**
+     * Gets only those errors where their group validation fails
+     *
+     * @param group
+     * @param key
+     * @returns {Promise<{}>}
+     */
+    async valuesObject(group) {
+        const values = {};
+        // Go deep only if group is NOT valid
+        const keys = Object.keys(group.keys);
+        await Promise.all(keys.map(async (currentKey) => {
+            if (group.keys.hasOwnProperty(currentKey)) {
+                // Group
+                if (typeof group.keys[currentKey].keys !== 'undefined') {
+                    Object.assign(values, await this.valuesObject(
+                        group.keys[currentKey],
+                        currentKey,
+                    ));
+                }
+                // Key
+                else {
+                    values[currentKey] = group.keys[currentKey].valueSanitized;
+                }
+            }
+        }));
+        return values;
+    }
 }
 
-module.exports = (config) => new Vldtr(config);
+module.exports = config => new Vldtr(config);
