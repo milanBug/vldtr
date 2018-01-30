@@ -1,6 +1,6 @@
 {
   "name": "vldtr",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Multi level validator, validator schemes (collection of validators) and sanitization with express middleware support.",
   "main": "index.js",
   "keywords": [

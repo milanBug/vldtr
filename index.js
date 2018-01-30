@@ -118,8 +118,11 @@ class Vldtr {
     async processKey(key, value) {
         let valueSanitized = value;
         let errors = {};
+        if (key.allowEmpty === true && value === '') {
+            // todo: refactor
+        }
         // If is set value
-        if (typeof value !== 'undefined') {
+        else if (typeof value !== 'undefined') {
             // Validators
             if (typeof key.validators !== 'undefined') {
                 Object.assign(errors, await this.validators(key.validators, value));
